@@ -1,29 +1,26 @@
 <?php
-$data = file_exists("data.json") ? json_decode(file_get_contents("data.json"), true) : [];
-$counterFile = 'counter.txt';
-$counter = file_exists($counterFile) ? (int)file_get_contents($counterFile) : 0;
+require_once 'init.php';
 
-// Ambil link aktif
-$activeLinks = array_values(array_filter($data, fn($d) => $d['active']));
+// Ambil link aktif dan urutan terakhir
+$stmt = $db->prepare("SELECT * FROM links WHERE active = 1 ORDER BY id ASC");
+$links = $stmt->execute() ? $stmt->fetchAll(SQLITE3_ASSOC) : [];
 
-// Jika tidak ada link aktif
-if (count($activeLinks) === 0) {
-    http_response_code(404);
-    echo "Tidak ada link aktif.";
-    exit;
+if (!$links) {
+    die("No active links.");
 }
 
-// Ambil target & update counter
-$target = $activeLinks[$counter % count($activeLinks)]['url'];
-file_put_contents($counterFile, $counter + 1);
+// Ambil index rotasi terakhir dari session
+session_start();
+if (!isset($_SESSION['last_index'])) {
+    $_SESSION['last_index'] = 0;
+} else {
+    $_SESSION['last_index'] = ($_SESSION['last_index'] + 1) % count($links);
+}
 
-// Simpan jumlah klik
-$clickLog = 'clicks.json';
-$clicks = file_exists($clickLog) ? json_decode(file_get_contents($clickLog), true) : [];
-$clicks[$target] = ($clicks[$target] ?? 0) + 1;
-file_put_contents($clickLog, json_encode($clicks, JSON_PRETTY_PRINT));
+$selected = $links[$_SESSION['last_index']];
 
-// Redirect
-header("Location: $target");
+// Tambah klik
+$db->exec("UPDATE links SET clicks = clicks + 1 WHERE id = {$selected['id']}");
+
+header("Location: " . $selected['url']);
 exit;
-?>
