@@ -1,26 +1,36 @@
 <?php
-require_once 'init.php';
+$db = new PDO('sqlite:database.sqlite');
 
-// Ambil link aktif dan urutan terakhir
-$stmt = $db->prepare("SELECT * FROM links WHERE active = 1 ORDER BY id ASC");
-$links = $stmt->execute() ? $stmt->fetchAll(SQLITE3_ASSOC) : [];
+$db->exec("CREATE TABLE IF NOT EXISTS redirects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL
+)");
+$db->exec("CREATE TABLE IF NOT EXISTS rolling_index (
+    id INTEGER PRIMARY KEY,
+    last_index INTEGER
+)");
 
-if (!$links) {
-    die("No active links.");
+$expectedParam = 'special-offerxjnck';
+$hasValidParam = isset($_GET[$expectedParam]);
+
+if (!$hasValidParam) {
+    header("Location: https://yahoo.co.jp");
+    exit;
 }
 
-// Ambil index rotasi terakhir dari session
-session_start();
-if (!isset($_SESSION['last_index'])) {
-    $_SESSION['last_index'] = 0;
-} else {
-    $_SESSION['last_index'] = ($_SESSION['last_index'] + 1) % count($links);
+$links = $db->query("SELECT url FROM redirects")->fetchAll(PDO::FETCH_COLUMN);
+if (count($links) === 0) {
+    echo "Belum ada link redirect ditambahkan.";
+    exit;
 }
 
-$selected = $links[$_SESSION['last_index']];
+$lastIndex = $db->query("SELECT last_index FROM rolling_index WHERE id = 1")->fetchColumn();
+if ($lastIndex === false) $lastIndex = -1;
 
-// Tambah klik
-$db->exec("UPDATE links SET clicks = clicks + 1 WHERE id = {$selected['id']}");
+$nextIndex = ($lastIndex + 1) % count($links);
 
-header("Location: " . $selected['url']);
+$stmt = $db->prepare("REPLACE INTO rolling_index (id, last_index) VALUES (1, :next)");
+$stmt->execute(['next' => $nextIndex]);
+
+header("Location: " . $links[$nextIndex]);
 exit;
