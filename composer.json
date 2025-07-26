@@ -1,21 +1,6 @@
 {
-  "require": {},
-  "require-dev": {},
-  "config": {
-    "platform": {
-      "php": "8.1"
+    "require": {
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*"
     }
-  },
-  "scripts": {
-    "post-install-cmd": [
-      "php -r \"if (!file_exists('database.sqlite')) { touch('database.sqlite'); }\""
-    ]
-  },
-  "extra": {
-    "heroku": {
-      "php": {
-        "extensions": ["pdo_sqlite"]
-      }
-    }
-  }
 }
