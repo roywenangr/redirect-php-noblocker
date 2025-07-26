@@ -1,0 +1,8 @@
+{
+  "require": {},
+  "scripts": {
+    "post-install-cmd": [
+      "php -r \"if (!file_exists('database.sqlite')) { touch('database.sqlite'); }\""
+    ]
+  }
+}
