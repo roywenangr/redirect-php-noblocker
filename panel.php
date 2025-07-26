@@ -1,76 +1,56 @@
 <?php
-require_once 'init.php';
 session_start();
-$password = "admin123";
+$password = 'admin123';
 
-if (isset($_POST['password']) && $_POST['password'] === $password) {
-    $_SESSION['logged_in'] = true;
+$db = new PDO('sqlite:database.sqlite');
+$db->exec("CREATE TABLE IF NOT EXISTS redirects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL
+)");
+
+if (isset($_POST['password'])) {
+    if ($_POST['password'] === $password) {
+        $_SESSION['logged_in'] = true;
+    }
 }
-
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header("Location: panel.php");
+    exit;
+}
 if (!isset($_SESSION['logged_in'])):
 ?>
-<!DOCTYPE html>
-<html><body><form method="POST"><input type="password" name="password"/><button>Login</button></form></body></html>
+<form method="POST">
+    <h2>Login Panel</h2>
+    <input type="password" name="password" placeholder="Password">
+    <button type="submit">Login</button>
+</form>
 <?php exit; endif;
 
-// Tambah link
-if (isset($_POST['new_link'])) {
-    $url = $_POST['new_link'];
-    $stmt = $db->prepare("INSERT INTO links (url, active, clicks) VALUES (:url, 1, 0)");
-    $stmt->bindValue(":url", $url, SQLITE3_TEXT);
-    $stmt->execute();
+if (isset($_POST['url'])) {
+    $url = trim($_POST['url']);
+    if (filter_var($url, FILTER_VALIDATE_URL)) {
+        $stmt = $db->prepare("INSERT INTO redirects (url) VALUES (:url)");
+        $stmt->execute(['url' => $url]);
+        $msg = "Link berhasil ditambahkan.";
+    } else {
+        $msg = "URL tidak valid.";
+    }
 }
 
-// Hapus link
-if (isset($_POST['delete'])) {
-    $db->exec("DELETE FROM links WHERE id = " . (int)$_POST['delete']);
-}
-
-// Toggle aktif
-if (isset($_POST['toggle'])) {
-    $id = (int)$_POST['toggle'];
-    $db->exec("UPDATE links SET active = NOT active WHERE id = $id");
-}
-
-// Ambil data
-$res = $db->query("SELECT * FROM links ORDER BY id ASC");
-$links = [];
-while ($row = $res->fetchArray(SQLITE3_ASSOC)) $links[] = $row;
+$rows = $db->query("SELECT * FROM redirects")->fetchAll(PDO::FETCH_ASSOC);
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Redirect Panel</title>
-    <style>
-        body { font-family: sans-serif; background: #121212; color: #eee; padding: 2em; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1em; }
-        td, th { padding: .5em; border: 1px solid #444; text-align: center; }
-        form { display: inline; }
-        input[type="text"] { width: 300px; padding: 0.5em; background: #222; color: #fff; border: 1px solid #444; }
-        button { background: #333; color: #fff; padding: 0.4em 1em; border: none; cursor: pointer; }
-        button:hover { background: #555; }
-    </style>
-</head>
-<body>
-    <h2>Redirect Panel</h2>
-    <form method="POST">
-        <input type="text" name="new_link" placeholder="https://example.com" required>
-        <button type="submit">Tambah Link</button>
-    </form>
-    <table>
-        <tr><th>ID</th><th>URL</th><th>Aktif</th><th>Clicks</th><th>Aksi</th></tr>
-        <?php foreach ($links as $link): ?>
-            <tr>
-                <td><?= $link['id'] ?></td>
-                <td><?= htmlspecialchars($link['url']) ?></td>
-                <td><?= $link['active'] ? '✅' : '❌' ?></td>
-                <td><?= $link['clicks'] ?></td>
-                <td>
-                    <form method="POST"><input type="hidden" name="toggle" value="<?= $link['id'] ?>"><button>Toggle</button></form>
-                    <form method="POST"><input type="hidden" name="delete" value="<?= $link['id'] ?>"><button>Hapus</button></form>
-                </td>
-            </tr>
-        <?php endforeach ?>
-    </table>
-</body>
-</html>
+<h2>Panel Redirect</h2>
+<a href="?logout=1">Logout</a>
+<?php if (isset($msg)) echo "<p>$msg</p>"; ?>
+<form method="POST">
+    <input type="text" name="url" placeholder="https://example.com" required>
+    <button type="submit">Tambah Redirect</button>
+</form>
+
+<h3>Daftar Redirect:</h3>
+<ol>
+<?php foreach ($rows as $row): ?>
+    <li><?= htmlspecialchars($row['url']) ?></li>
+<?php endforeach; ?>
+</ol>
